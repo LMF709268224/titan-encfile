@@ -21,14 +21,6 @@ func encrypt(ctx *cli.Context) error {
 	outfile := ctx.String("out")
 	password := ctx.String("password")
 
-	if infile == "" {
-		return fmt.Errorf("no input file specified")
-	}
-
-	if outfile == "" {
-		return fmt.Errorf("no output file specified")
-	}
-
 	if len(password) < 6 {
 		return fmt.Errorf("password length should >= 6")
 	}
@@ -68,14 +60,6 @@ func decrypt(ctx *cli.Context) error {
 	outfile := ctx.String("out")
 	password := ctx.String("password")
 
-	if infile == "" {
-		return fmt.Errorf("no input file specified")
-	}
-
-	if outfile == "" {
-		return fmt.Errorf("no output file specified")
-	}
-
 	if len(password) < 6 {
 		return fmt.Errorf("password length should >= 6")
 	}
@@ -98,7 +82,7 @@ func decrypt(ctx *cli.Context) error {
 
 	r, err := c.NewDecrypter(in, []byte(password))
 	if err != nil {
-		return fmt.Errorf("NewEncrypter failed:%v", err)
+		return fmt.Errorf("NewDecrypter failed:%v", err)
 	}
 
 	cx, err := io.Copy(out, r)
@@ -141,7 +125,8 @@ func main() {
 			&cli.StringFlag{
 				Name:     "password",
 				Required: true,
-				EnvVars:  []string{"ENCFILE_PASSWORD"},
+
+				EnvVars: []string{"ENCFILE_PASSWORD"},
 			},
 			&cli.StringFlag{
 				Name:     "in",
