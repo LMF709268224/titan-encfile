@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -37,6 +38,7 @@ func encrypt(ctx *cli.Context) error {
 		out.Close()
 	}()
 
+	start := time.Now()
 	r, err := c.NewEncrypter(in, []byte(password))
 	if err != nil {
 		return fmt.Errorf("NewEncrypter failed:%v", err)
@@ -47,7 +49,8 @@ func encrypt(ctx *cli.Context) error {
 		return fmt.Errorf("io.Copy failed:%v", err)
 	}
 
-	log.Infof("encrypt file %s, write:%d bytes to %s", infile, cx, outfile)
+	elapsed := time.Since(start)
+	log.Infof("encrypt file %s, write:%d bytes to %s, time:%s", infile, cx, outfile, elapsed)
 	return nil
 }
 
@@ -76,6 +79,7 @@ func decrypt(ctx *cli.Context) error {
 		out.Close()
 	}()
 
+	start := time.Now()
 	r, err := c.NewDecrypter(in, []byte(password))
 	if err != nil {
 		return fmt.Errorf("NewDecrypter failed:%v", err)
@@ -86,7 +90,8 @@ func decrypt(ctx *cli.Context) error {
 		return fmt.Errorf("io.Copy failed:%v", err)
 	}
 
-	log.Infof("decrypt file %s, write:%d bytes to %s", infile, cx, outfile)
+	elapsed := time.Since(start)
+	log.Infof("decrypt file %s, write:%d bytes to %s, time:%s", infile, cx, outfile, elapsed)
 	return nil
 }
 
