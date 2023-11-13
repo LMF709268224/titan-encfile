@@ -2,6 +2,7 @@ package main
 
 import (
 	c "encfile/crypto"
+	"encfile/version"
 	"fmt"
 	"io"
 	"os"
@@ -9,11 +10,6 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/urfave/cli/v2"
-)
-
-var (
-	GITCOMMIT = ""
-	VERSION   = "1.0"
 )
 
 func encrypt(ctx *cli.Context) error {
@@ -96,13 +92,13 @@ func decrypt(ctx *cli.Context) error {
 
 func main() {
 	cli.VersionPrinter = func(cCtx *cli.Context) {
-		fmt.Printf("version=%s commit=%s\n", cCtx.App.Version, GITCOMMIT)
+		fmt.Printf("version=%s commit=%s\n", cCtx.App.Version, version.GITCOMMIT)
 	}
 
 	app := &cli.App{
 		Name:    "encfile",
 		Usage:   "encrypt or decrypt file",
-		Version: VERSION,
+		Version: version.VERSION,
 		Commands: []*cli.Command{
 			{
 				Name:    "encrypt",
