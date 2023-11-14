@@ -1,0 +1,11 @@
+FROM scratch
+
+WORKDIR /app
+
+COPY ./encfile ./encfile
+
+ENV ENCFILE_PASSWORD=123456
+ENV ENCFILE_IN=/var/encfile/myfile
+ENV ENCFILE_OUT=/var/encfile/myfile.bin
+
+ENTRYPOINT ["./encfile", "encrypt"]

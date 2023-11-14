@@ -16,5 +16,12 @@ GOFLAGS+=-ldflags="$(ldflags)"
 encfile:
 	$(GOCC) build $(GOFLAGS) -o encfile .
 
+encfile_container:
+	CGO_ENABLED=0 $(GOCC) build $(GOFLAGS) -o encfile .
+	sudo docker rmi encfilee:latest || true
+	sudo docker rmi encfiled:latest || true
+	sudo docker build -t encfilee:latest -f ./Dockerfile.encrypt .
+	sudo docker build -t encfiled:latest -f ./Dockerfile.decrypt .
+
 clean:
 	rm -rf encfile
