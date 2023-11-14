@@ -47,7 +47,7 @@ var (
 	Overhead = HeaderSize + hmacSize
 )
 
-var DecryptErr = errors.New("message corrupt or incorrect password")
+var ErrDecrypt = errors.New("message corrupt or incorrect password")
 
 // Hash hashes the plaintext based on the header of the encrypted file and returns the hash Sum.
 func Hash(plainTextR io.Reader, headerR io.Reader, password []byte, h hash.Hash) ([]byte, error) {

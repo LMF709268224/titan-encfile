@@ -13,7 +13,7 @@ import (
 type Version uint32
 
 // decrypter is a function that creates a decrypter.
-type decrypter func(io.Reader, []byte) (io.ReadCloser, error)
+type decrypter func(io.ReadSeeker, []byte) (io.Reader, error)
 
 // encrypter is a function that creates a encrypter.
 type encrypter func(io.Reader, []byte) (io.Reader, error)
@@ -72,7 +72,7 @@ func NewEncrypter(r io.Reader, password []byte) (io.Reader, error) {
 }
 
 // NewDecrypter returns a decrypting reader based on the version used to encrypt.
-func NewDecrypter(r io.Reader, password []byte) (io.ReadCloser, error) {
+func NewDecrypter(r io.ReadSeeker, password []byte) (io.Reader, error) {
 	version, err := readVersion(r)
 	if err != nil {
 		return nil, err
