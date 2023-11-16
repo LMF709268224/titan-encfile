@@ -1,25 +1,48 @@
 package main
 
 import (
-	c "encfile/crypto"
-	"encfile/version"
+	"crypto/rand"
 	"fmt"
 	"io"
 	"os"
 	"time"
 
+	c "encfile/crypto"
+	"encfile/version"
+
+	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/crypto/ecies"
 	log "github.com/sirupsen/logrus"
 
 	"github.com/urfave/cli/v2"
 )
 
+const (
+	locatorURL = "https://120.79.221.36:5000/rpc/v0"
+	apiKey     = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJ1c2VyIl0sIklEIjoiMHhlYjU0OWYwYjk4ODdmNDE1MGRiZDNiZDBhMjU3ZDk5ZDVlMzE2ZGJhIiwiTm9kZUlEIjoiIiwiRXh0ZW5kIjoiIn0.16n87W0DvAZp60JSRHHNbo-DLU_Tycp-Av5mrnpsHVI"
+)
+
 func encrypt(ctx *cli.Context) error {
 	infile := ctx.String("in")
 	outfile := ctx.String("out")
+	// TODO randomly generated
 	password := ctx.String("password")
 
 	if len(password) < 6 {
 		return fmt.Errorf("password length should >= 6")
+	}
+
+	if len(password) > 15 {
+		return fmt.Errorf("password length should <= 15")
+	}
+
+	passBytes := []byte(password)
+
+	pKey := os.Getenv("PRIVATE_KEY")
+
+	cryptPass, err := encryptPassword(passBytes, pKey)
+	if err != nil {
+		return fmt.Errorf("encryptPassword error %s", err.Error())
 	}
 
 	in, err := os.Open(infile)
@@ -39,7 +62,7 @@ func encrypt(ctx *cli.Context) error {
 	}()
 
 	start := time.Now()
-	r, err := c.NewEncrypter(in, []byte(password))
+	r, err := c.NewEncrypter(in, passBytes, cryptPass)
 	if err != nil {
 		return fmt.Errorf("NewEncrypter failed:%v", err)
 	}
@@ -59,8 +82,11 @@ func decrypt(ctx *cli.Context) error {
 	outfile := ctx.String("out")
 	password := ctx.String("password")
 
-	if len(password) < 6 {
-		return fmt.Errorf("password length should >= 6")
+	var passBytes []byte
+	decryptPassFunc := decryptPassword
+	if len(password) > 0 {
+		passBytes = []byte(password)
+		decryptPassFunc = nil
 	}
 
 	in, err := os.Open(infile)
@@ -80,7 +106,7 @@ func decrypt(ctx *cli.Context) error {
 	}()
 
 	start := time.Now()
-	r, err := c.NewDecrypter(in, []byte(password))
+	r, err := c.NewDecrypter(in, passBytes, decryptPassFunc)
 	if err != nil {
 		return fmt.Errorf("NewDecrypter failed:%v", err)
 	}
@@ -125,9 +151,8 @@ func main() {
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:     "password",
-				Required: true,
-
-				EnvVars: []string{"ENCFILE_PASSWORD"},
+				Required: false,
+				EnvVars:  []string{"ENCFILE_PASSWORD"},
 			},
 			&cli.StringFlag{
 				Name:     "in",
@@ -145,4 +170,31 @@ func main() {
 	if err := app.Run(os.Args); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func encryptPassword(pass []byte, pKey string) ([]byte, error) {
+	privateKeyECDSA, err := crypto.HexToECDSA(pKey)
+	if err != nil {
+		return nil, err
+	}
+
+	// encrypt
+	publicKeyECDSA := &privateKeyECDSA.PublicKey
+	publicKey := ecies.ImportECDSAPublic(publicKeyECDSA)
+
+	return ecies.Encrypt(rand.Reader, publicKey, pass, nil, nil)
+}
+
+func decryptPassword(cryptPass []byte) ([]byte, error) {
+	pKey := os.Getenv("PRIVATE_KEY")
+
+	privateKeyECDSA, err := crypto.HexToECDSA(pKey)
+	if err != nil {
+		return nil, err
+	}
+
+	// decrypt
+	privateKey := ecies.ImportECDSA(privateKeyECDSA)
+
+	return privateKey.Decrypt(cryptPass, nil, nil)
 }

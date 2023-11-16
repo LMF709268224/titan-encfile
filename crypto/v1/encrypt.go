@@ -8,6 +8,7 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"hash"
 	"io"
 
@@ -27,8 +28,10 @@ func keys(pass, salt []byte, iterations int) (aesKey, hmacKey []byte, err error)
 	if err != nil {
 		return nil, nil, err
 	}
+
 	aesKey = append(aesKey, key[:aesKeySize]...)
 	hmacKey = append(hmacKey, key[aesKeySize:keySize]...)
+
 	return aesKey, hmacKey, nil
 }
 
@@ -36,12 +39,13 @@ func keys(pass, salt []byte, iterations int) (aesKey, hmacKey []byte, err error)
 // It uses a user provided password and a random salt to derive keys.
 // If the key is provided interactively, it should be verified since there
 // is no recovery.
-func NewEncryptReader(r io.Reader, pass []byte) (io.Reader, error) {
+func NewEncryptReader(r io.Reader, pass, cryptPass []byte) (io.Reader, error) {
 	salt, err := randBytes(saltSize)
 	if err != nil {
 		return nil, err
 	}
-	return newEncryptReader(r, pass, salt, scryptIterations)
+
+	return newEncryptReader(r, pass, cryptPass, salt, scryptIterations)
 }
 
 // Make sure we implement io.ReadWriter.
@@ -60,6 +64,7 @@ func (h *hashReadWriter) Write(p []byte) (int, error) {
 	if h.done {
 		return 0, errors.New("writing to hashReadWriter after read is not allowed")
 	}
+
 	return h.hash.Write(p)
 }
 
@@ -69,6 +74,7 @@ func (h *hashReadWriter) Read(p []byte) (int, error) {
 		h.done = true
 		h.sum = bytes.NewReader(h.hash.Sum(nil))
 	}
+
 	return h.sum.Read(p)
 }
 
@@ -78,6 +84,7 @@ func encInt32(i int32) ([]byte, error) {
 	if err := binary.Write(buf, binary.LittleEndian, i); err != nil {
 		return nil, err
 	}
+
 	return buf.Bytes(), nil
 }
 
@@ -86,28 +93,38 @@ func decInt32(r io.Reader) (b []byte, i int32, err error) {
 	buf := new(bytes.Buffer)
 	tr := io.TeeReader(r, buf)
 	err = binary.Read(tr, binary.LittleEndian, &i)
+
 	return buf.Bytes(), i, err
 }
 
 // newEncryptReader returns a encryptReader wrapping an io.Reader.
 // It uses a user provided password and the provided salt iterated the
 // provided number of times to derive keys.
-func newEncryptReader(r io.Reader, pass, salt []byte, iterations int32) (io.Reader, error) {
+func newEncryptReader(r io.Reader, pass, cryptPass, salt []byte, iterations int32) (io.Reader, error) {
 	itersAsBytes, err := encInt32(iterations)
 	if err != nil {
 		return nil, err
 	}
+
 	aesKey, hmacKey, err := keys(pass, salt, int(iterations))
 	if err != nil {
 		return nil, err
 	}
+
 	iv, err := randBytes(blockSize)
 	if err != nil {
 		return nil, err
 	}
+
+	passLen := len(cryptPass)
+	fmt.Println("passLen : ", passLen)
+	pLen := intToBytes(passLen)
+
 	var header []byte
 	header = append(header, itersAsBytes...)
 	header = append(header, salt...)
+	header = append(header, pLen...)
+	header = append(header, cryptPass...)
 	header = append(header, iv...)
 	return encrypter(r, aesKey, hmacKey, iv, header)
 }
@@ -118,6 +135,7 @@ func encrypter(r io.Reader, aesKey, hmacKey, iv, header []byte) (io.Reader, erro
 	if err != nil {
 		return nil, err
 	}
+
 	h := hmac.New(hashFunc, hmacKey)
 	hr := &hashReadWriter{hash: h}
 	sr := &cipher.StreamReader{R: r, S: cipher.NewCTR(b, iv)}

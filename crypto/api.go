@@ -2,24 +2,25 @@ package crypto
 
 import (
 	"bytes"
-	v1 "encfile/crypto/v1"
 	"encoding/binary"
 	"fmt"
 	"hash"
 	"io"
+
+	v1 "encfile/crypto/v1"
 )
 
 // Version is the version of the en/decryption library used.
 type Version uint32
 
 // decrypter is a function that creates a decrypter.
-type decrypter func(io.ReadSeeker, []byte) (io.Reader, error)
+type decrypter func(io.ReadSeeker, []byte, func([]byte) ([]byte, error)) (io.Reader, error)
 
 // encrypter is a function that creates a encrypter.
-type encrypter func(io.Reader, []byte) (io.Reader, error)
+type encrypter func(io.Reader, []byte, []byte) (io.Reader, error)
 
 // hasher is a function that returns the hash of a plaintext as if it were encrypted.
-type hasher func(io.Reader, io.Reader, []byte, hash.Hash) ([]byte, error)
+type hasher func(io.Reader, io.Reader, hash.Hash, []byte) ([]byte, error)
 
 // These are the different versions of the en/decryption library.
 const (
@@ -29,9 +30,11 @@ const (
 // PreferedVersion is the preferred version of encryption.
 const PreferedVersion = V1
 
-var encrypters map[Version]encrypter
-var decrypters map[Version]decrypter
-var hashers map[Version]hasher
+var (
+	encrypters map[Version]encrypter
+	decrypters map[Version]decrypter
+	hashers    map[Version]hasher
+)
 
 // MaxHeaderSize is the maximum header size of all versions.
 // This many bytes at the beginning of a file should be enough to compute
@@ -55,7 +58,7 @@ func init() {
 }
 
 // NewEncrypter returns an encrypting reader using the PreferedVersion.
-func NewEncrypter(r io.Reader, password []byte) (io.Reader, error) {
+func NewEncrypter(r io.Reader, password, cryptPassword []byte) (io.Reader, error) {
 	v, err := writeVersion(PreferedVersion)
 	if err != nil {
 		return nil, err
@@ -64,7 +67,7 @@ func NewEncrypter(r io.Reader, password []byte) (io.Reader, error) {
 	if !ok {
 		return nil, fmt.Errorf("%v version could not be found", PreferedVersion)
 	}
-	encReader, err := encrypterFn(r, password)
+	encReader, err := encrypterFn(r, password, cryptPassword)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +75,7 @@ func NewEncrypter(r io.Reader, password []byte) (io.Reader, error) {
 }
 
 // NewDecrypter returns a decrypting reader based on the version used to encrypt.
-func NewDecrypter(r io.ReadSeeker, password []byte) (io.Reader, error) {
+func NewDecrypter(r io.ReadSeeker, pass []byte, decryptPassFunc func([]byte) ([]byte, error)) (io.Reader, error) {
 	version, err := readVersion(r)
 	if err != nil {
 		return nil, err
@@ -81,11 +84,11 @@ func NewDecrypter(r io.ReadSeeker, password []byte) (io.Reader, error) {
 	if !ok {
 		return nil, fmt.Errorf("unknown decrypter for version(%d)", version)
 	}
-	return decrypterFn(r, password)
+	return decrypterFn(r, pass, decryptPassFunc)
 }
 
 // Hash will hash of plaintext based on the header of the encrypted file and returns the hash Sum.
-func Hash(r io.Reader, header io.Reader, password []byte, hashFunc func() hash.Hash) ([]byte, error) {
+func Hash(r io.Reader, header io.Reader, hashFunc func() hash.Hash, pass []byte) ([]byte, error) {
 	h := hashFunc()
 	version, err := readVersion(io.TeeReader(header, h))
 	if err != nil {
@@ -95,7 +98,7 @@ func Hash(r io.Reader, header io.Reader, password []byte, hashFunc func() hash.H
 	if !ok {
 		return nil, fmt.Errorf("unknown hasher for version(%d)", version)
 	}
-	return hasherFn(r, header, password, h)
+	return hasherFn(r, header, h, pass)
 }
 
 // writeVersion converts a Version to a []byte.

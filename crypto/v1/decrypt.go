@@ -5,32 +5,66 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/hmac"
+	"errors"
+	"fmt"
 	"io"
 )
 
 // decodeHeader decodes the header of the reader.
 // It returns the keys, IV, and original header using the password and iterations in the reader.
-func decodeHeader(r io.Reader, password []byte) (aesKey, hmacKey, iv, header []byte, err error) {
+func decodeHeader(r io.Reader, pass []byte, decryptPassFunc func([]byte) ([]byte, error)) (aesKey, hmacKey, iv, header []byte, err error) {
 	itersAsBytes, iterations, err := decInt32(r)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
+
 	salt := make([]byte, saltSize)
-	iv = make([]byte, blockSize)
 	_, err = io.ReadFull(r, salt)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
+
+	pLen := make([]byte, passwordLenSize)
+	_, err = io.ReadFull(r, pLen)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+
+	passwordLen := bytesToInt(pLen)
+	fmt.Println("passwordLen : ", passwordLen)
+
+	cryptPass := make([]byte, passwordLen)
+	_, err = io.ReadFull(r, cryptPass)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+
+	iv = make([]byte, blockSize)
 	_, err = io.ReadFull(r, iv)
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
-	aesKey, hmacKey, err = keys(password, salt, int(iterations))
+
+	if len(pass) <= 0 {
+		if decryptPassFunc == nil {
+			return nil, nil, nil, nil, errors.New("pass and decryptPassFunc cannot be empty at the same time")
+		}
+
+		pass, err = decryptPassFunc(cryptPass)
+		if err != nil {
+			return nil, nil, nil, nil, err
+		}
+	}
+
+	aesKey, hmacKey, err = keys(pass, salt, int(iterations))
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
+
 	header = append(header, itersAsBytes...)
 	header = append(header, salt...)
+	header = append(header, pLen...)
+	header = append(header, cryptPass...)
 	header = append(header, iv...)
 	return aesKey, hmacKey, iv, header, err
 }
@@ -40,9 +74,9 @@ func decodeHeader(r io.Reader, password []byte) (aesKey, hmacKey, iv, header []b
 // hash the contents to verify that it is safe to decrypt.
 // If the file is athenticated, the DecryptReader will be returned and
 // the resulting bytes will be the plaintext.
-func NewDecryptReader(r io.ReadSeeker, pass []byte) (io.Reader, error) {
+func NewDecryptReader(r io.ReadSeeker, pass []byte, decryptPassFunc func([]byte) ([]byte, error)) (io.Reader, error) {
 	mac := make([]byte, hmacSize)
-	aesKey, hmacKey, iv, header, err := decodeHeader(r, pass)
+	aesKey, hmacKey, iv, header, err := decodeHeader(r, pass, decryptPassFunc)
 	h := hmac.New(hashFunc, hmacKey)
 	h.Write(header)
 	if err != nil {
