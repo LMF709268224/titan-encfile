@@ -18,6 +18,9 @@ import (
 )
 
 const (
+	passwordLenMax = 14
+	passwordLenMin = 6
+
 	locatorURL = "https://120.79.221.36:5000/rpc/v0"
 	apiKey     = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJ1c2VyIl0sIklEIjoiMHhlYjU0OWYwYjk4ODdmNDE1MGRiZDNiZDBhMjU3ZDk5ZDVlMzE2ZGJhIiwiTm9kZUlEIjoiIiwiRXh0ZW5kIjoiIn0.16n87W0DvAZp60JSRHHNbo-DLU_Tycp-Av5mrnpsHVI"
 )
@@ -25,20 +28,19 @@ const (
 func encrypt(ctx *cli.Context) error {
 	infile := ctx.String("in")
 	outfile := ctx.String("out")
-	// TODO randomly generated
 	password := ctx.String("password")
 
-	if len(password) < 6 {
+	pKey := ctx.String("key")
+
+	if len(password) < passwordLenMin {
 		return fmt.Errorf("password length should >= 6")
 	}
 
-	if len(password) > 15 {
-		return fmt.Errorf("password length should <= 15")
+	if len(password) > passwordLenMax {
+		return fmt.Errorf("password length should <= 14")
 	}
 
 	passBytes := []byte(password)
-
-	pKey := os.Getenv("PRIVATE_KEY")
 
 	cryptPass, err := encryptPassword(passBytes, pKey)
 	if err != nil {
@@ -83,10 +85,8 @@ func decrypt(ctx *cli.Context) error {
 	password := ctx.String("password")
 
 	var passBytes []byte
-	decryptPassFunc := decryptPassword
 	if len(password) > 0 {
 		passBytes = []byte(password)
-		decryptPassFunc = nil
 	}
 
 	in, err := os.Open(infile)
@@ -106,6 +106,20 @@ func decrypt(ctx *cli.Context) error {
 	}()
 
 	start := time.Now()
+
+	pKey := ctx.String("key")
+	decryptPassFunc := func(cryptPass []byte) ([]byte, error) {
+		privateKeyECDSA, err := crypto.HexToECDSA(pKey)
+		if err != nil {
+			return nil, err
+		}
+
+		// decrypt
+		privateKey := ecies.ImportECDSA(privateKeyECDSA)
+
+		return privateKey.Decrypt(cryptPass, nil, nil)
+	}
+
 	r, err := c.NewDecrypter(in, passBytes, decryptPassFunc)
 	if err != nil {
 		return fmt.Errorf("NewDecrypter failed:%v", err)
@@ -155,6 +169,11 @@ func main() {
 				EnvVars:  []string{"ENCFILE_PASSWORD"},
 			},
 			&cli.StringFlag{
+				Name:     "key",
+				Required: false,
+				EnvVars:  []string{"PRIVATE_KEY"},
+			},
+			&cli.StringFlag{
 				Name:     "in",
 				Required: true,
 				EnvVars:  []string{"ENCFILE_IN"},
@@ -183,18 +202,4 @@ func encryptPassword(pass []byte, pKey string) ([]byte, error) {
 	publicKey := ecies.ImportECDSAPublic(publicKeyECDSA)
 
 	return ecies.Encrypt(rand.Reader, publicKey, pass, nil, nil)
-}
-
-func decryptPassword(cryptPass []byte) ([]byte, error) {
-	pKey := os.Getenv("PRIVATE_KEY")
-
-	privateKeyECDSA, err := crypto.HexToECDSA(pKey)
-	if err != nil {
-		return nil, err
-	}
-
-	// decrypt
-	privateKey := ecies.ImportECDSA(privateKeyECDSA)
-
-	return privateKey.Decrypt(cryptPass, nil, nil)
 }

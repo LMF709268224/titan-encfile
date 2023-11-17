@@ -1,10 +1,8 @@
 package v1
 
 import (
-	"bytes"
 	"crypto/aes"
 	"crypto/sha512"
-	"encoding/binary"
 	"errors"
 	"hash"
 	"io"
@@ -20,8 +18,8 @@ const (
 	// The size of the random salt.
 	saltSize = 32 // 256 bits
 
-	// The size of the password len.
-	passwordLenSize = 8
+	// The size of the password .
+	passwordSize = 128 // 1024 bits
 
 	// The size of the AES key.
 	aesKeySize = 32 // 256 bits
@@ -45,7 +43,7 @@ var (
 	keySize = hmacKeySize + aesKeySize
 
 	// The size of the Header.
-	HeaderSize = 4 + saltSize + blockSize
+	HeaderSize = 4 + saltSize + passwordSize + blockSize
 
 	// The overhead added to the file by using this library.
 	// Overhead + len(plaintext) == len(ciphertext)
@@ -70,16 +68,19 @@ func Hash(plainTextR io.Reader, headerR io.Reader, h hash.Hash, pass []byte) ([]
 	return h.Sum(nil), nil
 }
 
-func intToBytes(n int) []byte {
-	data := int64(n)
-	bytebuf := bytes.NewBuffer([]byte{})
-	binary.Write(bytebuf, binary.BigEndian, data)
-	return bytebuf.Bytes()
+func padTo128Bytes(input []byte) []byte {
+	length := len(input)
+	if length >= passwordSize {
+		return nil
+	}
+
+	output := make([]byte, passwordSize)
+	output[0] = byte(length)
+	copy(output[1:], input)
+	return output
 }
 
-func bytesToInt(bys []byte) int {
-	bytebuff := bytes.NewBuffer(bys)
-	var data int64
-	binary.Read(bytebuff, binary.BigEndian, &data)
-	return int(data)
+func restoreOriginalBytes(input []byte) []byte {
+	length := int(input[0])
+	return input[1 : length+1]
 }

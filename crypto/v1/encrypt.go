@@ -8,7 +8,6 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"hash"
 	"io"
 
@@ -116,15 +115,12 @@ func newEncryptReader(r io.Reader, pass, cryptPass, salt []byte, iterations int3
 		return nil, err
 	}
 
-	passLen := len(cryptPass)
-	fmt.Println("passLen : ", passLen)
-	pLen := intToBytes(passLen)
+	padded := padTo128Bytes(cryptPass)
 
 	var header []byte
 	header = append(header, itersAsBytes...)
 	header = append(header, salt...)
-	header = append(header, pLen...)
-	header = append(header, cryptPass...)
+	header = append(header, padded...)
 	header = append(header, iv...)
 	return encrypter(r, aesKey, hmacKey, iv, header)
 }

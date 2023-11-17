@@ -6,7 +6,6 @@ import (
 	"crypto/cipher"
 	"crypto/hmac"
 	"errors"
-	"fmt"
 	"io"
 )
 
@@ -24,16 +23,7 @@ func decodeHeader(r io.Reader, pass []byte, decryptPassFunc func([]byte) ([]byte
 		return nil, nil, nil, nil, err
 	}
 
-	pLen := make([]byte, passwordLenSize)
-	_, err = io.ReadFull(r, pLen)
-	if err != nil {
-		return nil, nil, nil, nil, err
-	}
-
-	passwordLen := bytesToInt(pLen)
-	fmt.Println("passwordLen : ", passwordLen)
-
-	cryptPass := make([]byte, passwordLen)
+	cryptPass := make([]byte, passwordSize)
 	_, err = io.ReadFull(r, cryptPass)
 	if err != nil {
 		return nil, nil, nil, nil, err
@@ -50,7 +40,9 @@ func decodeHeader(r io.Reader, pass []byte, decryptPassFunc func([]byte) ([]byte
 			return nil, nil, nil, nil, errors.New("pass and decryptPassFunc cannot be empty at the same time")
 		}
 
-		pass, err = decryptPassFunc(cryptPass)
+		restored := restoreOriginalBytes(cryptPass)
+
+		pass, err = decryptPassFunc(restored)
 		if err != nil {
 			return nil, nil, nil, nil, err
 		}
@@ -63,7 +55,6 @@ func decodeHeader(r io.Reader, pass []byte, decryptPassFunc func([]byte) ([]byte
 
 	header = append(header, itersAsBytes...)
 	header = append(header, salt...)
-	header = append(header, pLen...)
 	header = append(header, cryptPass...)
 	header = append(header, iv...)
 	return aesKey, hmacKey, iv, header, err
