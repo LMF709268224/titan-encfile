@@ -18,6 +18,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
 	"github.com/urfave/cli/v2"
 )
@@ -56,7 +57,6 @@ func encrypt(infile, password, privateKey string) error {
 	}()
 
 	dir := filepath.Dir(infile)
-
 	ext := filepath.Ext(infile)
 	fmt.Println("ext :", ext)
 
@@ -64,7 +64,7 @@ func encrypt(infile, password, privateKey string) error {
 	baseName := fileName[0 : len(fileName)-len(ext)]
 	fmt.Println("Base Name:", baseName)
 
-	outfile := fmt.Sprintf("%s\\%s_en", dir, baseName)
+	outfile := filepath.Join(dir, fmt.Sprintf("%s_en", baseName))
 	out, err := os.Create(outfile)
 	if err != nil {
 		return fmt.Errorf("create output file failed:%v", err)
@@ -136,7 +136,7 @@ func decrypt(infile, password, privateKey string) error {
 	fmt.Println("extB :", ext)
 
 	dir := filepath.Dir(infile)
-	outfile := fmt.Sprintf("%s\\de_file%s", dir, ext)
+	outfile := filepath.Join(dir, fmt.Sprintf("de_file%s", ext))
 
 	out, err := os.Create(outfile)
 	if err != nil {
@@ -232,18 +232,18 @@ func main() {
 	privateKeyEntry := widget.NewPasswordEntry()
 	privateKeyEntry.SetPlaceHolder("Enter private key...")
 
-	// inPutEntry := widget.NewLabel("Enter input file pash...")
-	inPutEntry := widget.NewEntry()
-	inPutEntry.SetPlaceHolder("Enter input file path...(ex: D:\\abc.txt)")
+	inPutEntry := widget.NewLabel("Enter input file pash...")
+	// inPutEntry := widget.NewEntry()
+	// inPutEntry.SetPlaceHolder("Enter input file path...(ex: D:\\abc.txt)")
 
-	// inPutBtn := widget.NewButton("select input file", func() {
-	// 	fd := dialog.NewFileOpen(func(reader fyne.URIReadCloser, err error) {
-	// 		if err == nil && reader != nil {
-	// 			inPutEntry.SetText(reader.URI().Path())
-	// 		}
-	// 	}, myWindow)
-	// 	fd.Show()
-	// })
+	inPutBtn := widget.NewButton("select input file", func() {
+		fd := dialog.NewFileOpen(func(reader fyne.URIReadCloser, err error) {
+			if err == nil && reader != nil {
+				inPutEntry.SetText(reader.URI().Path())
+			}
+		}, myWindow)
+		fd.Show()
+	})
 
 	// outPutEntry := widget.NewEntry()
 	// outPutEntry.SetPlaceHolder("Enter output file path...(ex: D:\\abc.txt)")
@@ -284,7 +284,7 @@ func main() {
 		privateKeyEntry,
 		passwordEntry,
 		inPutEntry,
-		// inPutBtn,
+		inPutBtn,
 		// outPutEntry,
 		resultLabel,
 		encryptBtn,
