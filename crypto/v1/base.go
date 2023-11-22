@@ -21,6 +21,9 @@ const (
 	// The size of the password .
 	passwordSize = 128 // 1024 bits
 
+	// The size of the file ext.
+	fileExtSize = 8 // 32 bits
+
 	// The size of the AES key.
 	aesKeySize = 32 // 256 bits
 
@@ -43,7 +46,7 @@ var (
 	keySize = hmacKeySize + aesKeySize
 
 	// The size of the Header.
-	HeaderSize = 4 + saltSize + passwordSize + blockSize
+	HeaderSize = 4 + saltSize + passwordSize + fileExtSize + blockSize
 
 	// The overhead added to the file by using this library.
 	// Overhead + len(plaintext) == len(ciphertext)
@@ -54,7 +57,7 @@ var ErrDecrypt = errors.New("message corrupt or incorrect password")
 
 // Hash hashes the plaintext based on the header of the encrypted file and returns the hash Sum.
 func Hash(plainTextR io.Reader, headerR io.Reader, h hash.Hash, pass []byte) ([]byte, error) {
-	aesKey, hmacKey, iv, eHeader, err := decodeHeader(headerR, pass, nil)
+	aesKey, hmacKey, iv, eHeader, _, err := decodeHeader(headerR, pass, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -68,13 +71,13 @@ func Hash(plainTextR io.Reader, headerR io.Reader, h hash.Hash, pass []byte) ([]
 	return h.Sum(nil), nil
 }
 
-func padTo128Bytes(input []byte) []byte {
+func padToSpecifiedBytes(input []byte, size int) []byte {
 	length := len(input)
-	if length >= passwordSize {
+	if length >= size {
 		return nil
 	}
 
-	output := make([]byte, passwordSize)
+	output := make([]byte, size)
 	output[0] = byte(length)
 	copy(output[1:], input)
 	return output

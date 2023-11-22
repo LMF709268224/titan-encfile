@@ -8,6 +8,7 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"hash"
 	"io"
 
@@ -38,13 +39,13 @@ func keys(pass, salt []byte, iterations int) (aesKey, hmacKey []byte, err error)
 // It uses a user provided password and a random salt to derive keys.
 // If the key is provided interactively, it should be verified since there
 // is no recovery.
-func NewEncryptReader(r io.Reader, pass, cryptPass []byte) (io.Reader, error) {
+func NewEncryptReader(r io.Reader, pass, cryptPass, fileExt []byte) (io.Reader, error) {
 	salt, err := randBytes(saltSize)
 	if err != nil {
 		return nil, err
 	}
 
-	return newEncryptReader(r, pass, cryptPass, salt, scryptIterations)
+	return newEncryptReader(r, pass, cryptPass, salt, fileExt, scryptIterations)
 }
 
 // Make sure we implement io.ReadWriter.
@@ -99,7 +100,7 @@ func decInt32(r io.Reader) (b []byte, i int32, err error) {
 // newEncryptReader returns a encryptReader wrapping an io.Reader.
 // It uses a user provided password and the provided salt iterated the
 // provided number of times to derive keys.
-func newEncryptReader(r io.Reader, pass, cryptPass, salt []byte, iterations int32) (io.Reader, error) {
+func newEncryptReader(r io.Reader, pass, cryptPass, salt, fileExt []byte, iterations int32) (io.Reader, error) {
 	itersAsBytes, err := encInt32(iterations)
 	if err != nil {
 		return nil, err
@@ -115,12 +116,16 @@ func newEncryptReader(r io.Reader, pass, cryptPass, salt []byte, iterations int3
 		return nil, err
 	}
 
-	padded := padTo128Bytes(cryptPass)
+	fmt.Println("fileExt size :", len(fileExt))
+
+	cryptPass2 := padToSpecifiedBytes(cryptPass, passwordSize)
+	fileExt2 := padToSpecifiedBytes(fileExt, fileExtSize)
 
 	var header []byte
 	header = append(header, itersAsBytes...)
 	header = append(header, salt...)
-	header = append(header, padded...)
+	header = append(header, cryptPass2...)
+	header = append(header, fileExt2...)
 	header = append(header, iv...)
 	return encrypter(r, aesKey, hmacKey, iv, header)
 }

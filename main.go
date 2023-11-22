@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"time"
 
 	c "encfile/crypto"
@@ -29,12 +30,12 @@ const (
 	apiKey     = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJ1c2VyIl0sIklEIjoiMHhlYjU0OWYwYjk4ODdmNDE1MGRiZDNiZDBhMjU3ZDk5ZDVlMzE2ZGJhIiwiTm9kZUlEIjoiIiwiRXh0ZW5kIjoiIn0.16n87W0DvAZp60JSRHHNbo-DLU_Tycp-Av5mrnpsHVI"
 )
 
-func encrypt(infile, outfile, password, privateKey string) error {
+func encrypt(infile, password, privateKey string) error {
 	// infile := ctx.String("in")
 	// outfile := ctx.String("out")
 	// password := ctx.String("password")
 	// pKey := ctx.String("key")
-	err := checkParameters(infile, outfile, password, privateKey, true)
+	err := checkParameters(infile, password, privateKey, true)
 	if err != nil {
 		return err
 	}
@@ -54,6 +55,16 @@ func encrypt(infile, outfile, password, privateKey string) error {
 		in.Close()
 	}()
 
+	dir := filepath.Dir(infile)
+
+	ext := filepath.Ext(infile)
+	fmt.Println("ext :", ext)
+
+	fileName := filepath.Base(infile)
+	baseName := fileName[0 : len(fileName)-len(ext)]
+	fmt.Println("Base Name:", baseName)
+
+	outfile := fmt.Sprintf("%s\\%s_en", dir, baseName)
 	out, err := os.Create(outfile)
 	if err != nil {
 		return fmt.Errorf("create output file failed:%v", err)
@@ -63,7 +74,7 @@ func encrypt(infile, outfile, password, privateKey string) error {
 	}()
 
 	start := time.Now()
-	r, err := c.NewEncrypter(in, passBytes, cryptPass)
+	r, err := c.NewEncrypter(in, passBytes, cryptPass, []byte(ext))
 	if err != nil {
 		return fmt.Errorf("NewEncrypter failed:%v", err)
 	}
@@ -78,13 +89,13 @@ func encrypt(infile, outfile, password, privateKey string) error {
 	return nil
 }
 
-func decrypt(infile, outfile, password, privateKey string) error {
+func decrypt(infile, password, privateKey string) error {
 	// infile := ctx.String("in")
 	// outfile := ctx.String("out")
 	// password := ctx.String("password")
 	// pKey := ctx.String("key")
 
-	err := checkParameters(infile, outfile, password, privateKey, false)
+	err := checkParameters(infile, password, privateKey, false)
 	if err != nil {
 		return err
 	}
@@ -102,14 +113,6 @@ func decrypt(infile, outfile, password, privateKey string) error {
 		in.Close()
 	}()
 
-	out, err := os.Create(outfile)
-	if err != nil {
-		return fmt.Errorf("create output file failed:%v", err)
-	}
-	defer func() {
-		out.Close()
-	}()
-
 	start := time.Now()
 
 	decryptPassFunc := func(cryptPass []byte) ([]byte, error) {
@@ -124,10 +127,24 @@ func decrypt(infile, outfile, password, privateKey string) error {
 		return privateKey.Decrypt(cryptPass, nil, nil)
 	}
 
-	r, err := c.NewDecrypter(in, passBytes, decryptPassFunc)
+	r, extB, err := c.NewDecrypter(in, passBytes, decryptPassFunc)
 	if err != nil {
 		return fmt.Errorf("NewDecrypter failed:%v", err)
 	}
+
+	ext := string(extB)
+	fmt.Println("extB :", ext)
+
+	dir := filepath.Dir(infile)
+	outfile := fmt.Sprintf("%s\\de_file%s", dir, ext)
+
+	out, err := os.Create(outfile)
+	if err != nil {
+		return fmt.Errorf("create output file failed:%v", err)
+	}
+	defer func() {
+		out.Close()
+	}()
 
 	cx, err := io.Copy(out, r)
 	if err != nil {
@@ -155,11 +172,11 @@ func main2() {
 				Usage:   "encrypt a file",
 				Action: func(cCtx *cli.Context) error {
 					infile := cCtx.String("in")
-					outfile := cCtx.String("out")
+					// outfile := cCtx.String("out")
 					password := cCtx.String("password")
 					pKey := cCtx.String("key")
 
-					return encrypt(infile, outfile, password, pKey)
+					return encrypt(infile, password, pKey)
 				},
 			},
 			{
@@ -168,11 +185,11 @@ func main2() {
 				Usage:   "decrypt a file",
 				Action: func(cCtx *cli.Context) error {
 					infile := cCtx.String("in")
-					outfile := cCtx.String("out")
+					// outfile := cCtx.String("out")
 					password := cCtx.String("password")
 					pKey := cCtx.String("key")
 
-					return decrypt(infile, outfile, password, pKey)
+					return decrypt(infile, password, pKey)
 				},
 			},
 		},
@@ -217,7 +234,7 @@ func main() {
 
 	// inPutEntry := widget.NewLabel("Enter input file pash...")
 	inPutEntry := widget.NewEntry()
-	inPutEntry.SetPlaceHolder("Enter output file path...(ex: D:\\abc.txt)")
+	inPutEntry.SetPlaceHolder("Enter input file path...(ex: D:\\abc.txt)")
 
 	// inPutBtn := widget.NewButton("select input file", func() {
 	// 	fd := dialog.NewFileOpen(func(reader fyne.URIReadCloser, err error) {
@@ -228,19 +245,19 @@ func main() {
 	// 	fd.Show()
 	// })
 
-	outPutEntry := widget.NewEntry()
-	outPutEntry.SetPlaceHolder("Enter output file path...(ex: D:\\abc.txt)")
+	// outPutEntry := widget.NewEntry()
+	// outPutEntry.SetPlaceHolder("Enter output file path...(ex: D:\\abc.txt)")
 
 	resultLabel := widget.NewLabel("")
 
 	encryptBtn := widget.NewButton("encrypt", func() {
 		infile := inPutEntry.Text
-		outfile := outPutEntry.Text
+		// outfile := outPutEntry.Text
 		password := passwordEntry.Text
 		pKey := privateKeyEntry.Text
 		resultText := "success !!!"
 
-		err := encrypt(infile, outfile, password, pKey)
+		err := encrypt(infile, password, pKey)
 		if err != nil {
 			resultText = err.Error()
 		}
@@ -250,12 +267,12 @@ func main() {
 
 	decryptBtn := widget.NewButton("decrypt", func() {
 		infile := inPutEntry.Text
-		outfile := outPutEntry.Text
+		// outfile := outPutEntry.Text
 		password := passwordEntry.Text
 		pKey := privateKeyEntry.Text
 		resultText := "success !!!"
 
-		err := decrypt(infile, outfile, password, pKey)
+		err := decrypt(infile, password, pKey)
 		if err != nil {
 			resultText = err.Error()
 		}
@@ -268,7 +285,7 @@ func main() {
 		passwordEntry,
 		inPutEntry,
 		// inPutBtn,
-		outPutEntry,
+		// outPutEntry,
 		resultLabel,
 		encryptBtn,
 		decryptBtn,
@@ -278,14 +295,14 @@ func main() {
 	myWindow.ShowAndRun()
 }
 
-func checkParameters(infile, outfile, password, pKey string, isEncrypt bool) error {
+func checkParameters(infile, password, pKey string, isEncrypt bool) error {
 	if infile == "" {
 		return fmt.Errorf("please enter the input file pash")
 	}
 
-	if outfile == "" {
-		return fmt.Errorf("please enter the output file pash")
-	}
+	// if outfile == "" {
+	// 	return fmt.Errorf("please enter the output file pash")
+	// }
 
 	if isEncrypt {
 		if pKey == "" {
