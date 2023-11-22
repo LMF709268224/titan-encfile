@@ -14,6 +14,10 @@ import (
 	"github.com/ethereum/go-ethereum/crypto/ecies"
 	log "github.com/sirupsen/logrus"
 
+	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/app"
+	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/widget"
 	"github.com/urfave/cli/v2"
 )
 
@@ -25,24 +29,19 @@ const (
 	apiKey     = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJ1c2VyIl0sIklEIjoiMHhlYjU0OWYwYjk4ODdmNDE1MGRiZDNiZDBhMjU3ZDk5ZDVlMzE2ZGJhIiwiTm9kZUlEIjoiIiwiRXh0ZW5kIjoiIn0.16n87W0DvAZp60JSRHHNbo-DLU_Tycp-Av5mrnpsHVI"
 )
 
-func encrypt(ctx *cli.Context) error {
-	infile := ctx.String("in")
-	outfile := ctx.String("out")
-	password := ctx.String("password")
-
-	pKey := ctx.String("key")
-
-	if len(password) < passwordLenMin {
-		return fmt.Errorf("password length should >= 6")
-	}
-
-	if len(password) > passwordLenMax {
-		return fmt.Errorf("password length should <= 14")
+func encrypt(infile, outfile, password, privateKey string) error {
+	// infile := ctx.String("in")
+	// outfile := ctx.String("out")
+	// password := ctx.String("password")
+	// pKey := ctx.String("key")
+	err := checkParameters(infile, outfile, password, privateKey, true)
+	if err != nil {
+		return err
 	}
 
 	passBytes := []byte(password)
 
-	cryptPass, err := encryptPassword(passBytes, pKey)
+	cryptPass, err := encryptPassword(passBytes, privateKey)
 	if err != nil {
 		return fmt.Errorf("encryptPassword error %s", err.Error())
 	}
@@ -79,10 +78,16 @@ func encrypt(ctx *cli.Context) error {
 	return nil
 }
 
-func decrypt(ctx *cli.Context) error {
-	infile := ctx.String("in")
-	outfile := ctx.String("out")
-	password := ctx.String("password")
+func decrypt(infile, outfile, password, privateKey string) error {
+	// infile := ctx.String("in")
+	// outfile := ctx.String("out")
+	// password := ctx.String("password")
+	// pKey := ctx.String("key")
+
+	err := checkParameters(infile, outfile, password, privateKey, false)
+	if err != nil {
+		return err
+	}
 
 	var passBytes []byte
 	if len(password) > 0 {
@@ -107,9 +112,8 @@ func decrypt(ctx *cli.Context) error {
 
 	start := time.Now()
 
-	pKey := ctx.String("key")
 	decryptPassFunc := func(cryptPass []byte) ([]byte, error) {
-		privateKeyECDSA, err := crypto.HexToECDSA(pKey)
+		privateKeyECDSA, err := crypto.HexToECDSA(privateKey)
 		if err != nil {
 			return nil, err
 		}
@@ -135,7 +139,7 @@ func decrypt(ctx *cli.Context) error {
 	return nil
 }
 
-func main() {
+func main2() {
 	cli.VersionPrinter = func(cCtx *cli.Context) {
 		fmt.Printf("version=%s commit=%s\n", cCtx.App.Version, version.GITCOMMIT)
 	}
@@ -150,7 +154,12 @@ func main() {
 				Aliases: []string{"e"},
 				Usage:   "encrypt a file",
 				Action: func(cCtx *cli.Context) error {
-					return encrypt(cCtx)
+					infile := cCtx.String("in")
+					outfile := cCtx.String("out")
+					password := cCtx.String("password")
+					pKey := cCtx.String("key")
+
+					return encrypt(infile, outfile, password, pKey)
 				},
 			},
 			{
@@ -158,7 +167,12 @@ func main() {
 				Aliases: []string{"d"},
 				Usage:   "decrypt a file",
 				Action: func(cCtx *cli.Context) error {
-					return decrypt(cCtx)
+					infile := cCtx.String("in")
+					outfile := cCtx.String("out")
+					password := cCtx.String("password")
+					pKey := cCtx.String("key")
+
+					return decrypt(infile, outfile, password, pKey)
 				},
 			},
 		},
@@ -189,6 +203,111 @@ func main() {
 	if err := app.Run(os.Args); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func main() {
+	myApp := app.New()
+	myWindow := myApp.NewWindow("文件加解密")
+
+	passwordEntry := widget.NewPasswordEntry()
+	passwordEntry.SetPlaceHolder("Enter password...")
+
+	privateKeyEntry := widget.NewPasswordEntry()
+	privateKeyEntry.SetPlaceHolder("Enter private key...")
+
+	// inPutEntry := widget.NewLabel("Enter input file pash...")
+	inPutEntry := widget.NewEntry()
+	inPutEntry.SetPlaceHolder("Enter output file path...(ex: D:\\abc.txt)")
+
+	// inPutBtn := widget.NewButton("select input file", func() {
+	// 	fd := dialog.NewFileOpen(func(reader fyne.URIReadCloser, err error) {
+	// 		if err == nil && reader != nil {
+	// 			inPutEntry.SetText(reader.URI().Path())
+	// 		}
+	// 	}, myWindow)
+	// 	fd.Show()
+	// })
+
+	outPutEntry := widget.NewEntry()
+	outPutEntry.SetPlaceHolder("Enter output file path...(ex: D:\\abc.txt)")
+
+	resultLabel := widget.NewLabel("")
+
+	encryptBtn := widget.NewButton("encrypt", func() {
+		infile := inPutEntry.Text
+		outfile := outPutEntry.Text
+		password := passwordEntry.Text
+		pKey := privateKeyEntry.Text
+		resultText := "success !!!"
+
+		err := encrypt(infile, outfile, password, pKey)
+		if err != nil {
+			resultText = err.Error()
+		}
+
+		resultLabel.SetText(resultText)
+	})
+
+	decryptBtn := widget.NewButton("decrypt", func() {
+		infile := inPutEntry.Text
+		outfile := outPutEntry.Text
+		password := passwordEntry.Text
+		pKey := privateKeyEntry.Text
+		resultText := "success !!!"
+
+		err := decrypt(infile, outfile, password, pKey)
+		if err != nil {
+			resultText = err.Error()
+		}
+
+		resultLabel.SetText(resultText)
+	})
+
+	myWindow.SetContent(container.NewVBox(
+		privateKeyEntry,
+		passwordEntry,
+		inPutEntry,
+		// inPutBtn,
+		outPutEntry,
+		resultLabel,
+		encryptBtn,
+		decryptBtn,
+	))
+
+	myWindow.Resize(fyne.NewSize(600, 400))
+	myWindow.ShowAndRun()
+}
+
+func checkParameters(infile, outfile, password, pKey string, isEncrypt bool) error {
+	if infile == "" {
+		return fmt.Errorf("please enter the input file pash")
+	}
+
+	if outfile == "" {
+		return fmt.Errorf("please enter the output file pash")
+	}
+
+	if isEncrypt {
+		if pKey == "" {
+			return fmt.Errorf("please enter the private key")
+		}
+
+		if len(password) < passwordLenMin {
+			return fmt.Errorf("password length should >= 6")
+		}
+
+		if len(password) > passwordLenMax {
+			return fmt.Errorf("password length should <= 14")
+		}
+
+		return nil
+	}
+
+	if pKey == "" && password == "" {
+		return fmt.Errorf("password and private key cannot be empty at the same time")
+	}
+
+	return nil
 }
 
 func encryptPassword(pass []byte, pKey string) ([]byte, error) {
