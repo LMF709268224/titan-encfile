@@ -301,11 +301,11 @@ func main() {
 
 		confirmDialog := dialog.NewConfirm("Please confirm to upload the following files", filePath, func(result bool) {
 			if result {
-				err := uploadFileToTitan(locatorURL, apiKey, filePath, "1")
+				fCid, err := uploadFileToTitan(locatorURL, apiKey, filePath, "1")
 				if err != nil {
 					uploadResultLabel.SetText(err.Error())
 				} else {
-					uploadResultLabel.SetText("upload success !")
+					uploadResultLabel.SetText(fCid)
 				}
 			}
 		}, window)
@@ -372,16 +372,18 @@ func encryptPassword(pass []byte, pKey string) ([]byte, error) {
 	return ecies.Encrypt(rand.Reader, publicKey, pass, nil, nil)
 }
 
-func uploadFileToTitan(locatorURL, apiKey, filePath, password string) error {
+func uploadFileToTitan(locatorURL, apiKey, filePath, password string) (string, error) {
 	storage, close, err := storage.NewStorage(locatorURL, apiKey)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer close()
 
 	progress := func(doneSize int64, totalSize int64) {
 		fmt.Printf("upload %d of %d \n", doneSize, totalSize)
 	}
+
+	fCid := ""
 
 	visitFile := func(fp string, fi os.DirEntry, err error) error {
 		// Check for and handle errors
@@ -399,14 +401,16 @@ func uploadFileToTitan(locatorURL, apiKey, filePath, password string) error {
 			return err
 		}
 
-		_, err = storage.UploadFilesWithPath(context.Background(), path, progress, password)
+		c, err := storage.UploadFilesWithPath(context.Background(), path, progress, password)
 		if err != nil {
 			return err
 		}
 
+		fCid = c.String()
 		fmt.Printf("totalSize %s success \n", fp)
+
 		return nil
 	}
 
-	return filepath.WalkDir(filePath, visitFile)
+	return fCid, filepath.WalkDir(filePath, visitFile)
 }
