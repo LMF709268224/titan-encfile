@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"fmt"
 	"io"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	c "encfile/crypto"
+	"encfile/storage"
 	"encfile/version"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -27,30 +29,30 @@ const (
 	passwordLenMax = 14
 	passwordLenMin = 6
 
+	textInputFile  = "Enter input file pash..."
+	textUploadFile = "Enter upload file pash..."
+	apiKeyFile     = "Enter api key..."
+
 	locatorURL = "https://120.79.221.36:5000/rpc/v0"
-	apiKey     = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJ1c2VyIl0sIklEIjoiMHhlYjU0OWYwYjk4ODdmNDE1MGRiZDNiZDBhMjU3ZDk5ZDVlMzE2ZGJhIiwiTm9kZUlEIjoiIiwiRXh0ZW5kIjoiIn0.16n87W0DvAZp60JSRHHNbo-DLU_Tycp-Av5mrnpsHVI"
+	// apiKey     = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJ1c2VyIl0sIklEIjoiMHhlYjU0OWYwYjk4ODdmNDE1MGRiZDNiZDBhMjU3ZDk5ZDVlMzE2ZGJhIiwiTm9kZUlEIjoiIiwiRXh0ZW5kIjoiIn0.16n87W0DvAZp60JSRHHNbo-DLU_Tycp-Av5mrnpsHVI"
 )
 
-func encrypt(infile, password, privateKey string) error {
-	// infile := ctx.String("in")
-	// outfile := ctx.String("out")
-	// password := ctx.String("password")
-	// pKey := ctx.String("key")
+func encrypt(infile, password, privateKey string) (string, error) {
 	err := checkParameters(infile, password, privateKey, true)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	passBytes := []byte(password)
 
 	cryptPass, err := encryptPassword(passBytes, privateKey)
 	if err != nil {
-		return fmt.Errorf("encryptPassword error %s", err.Error())
+		return "", fmt.Errorf("encryptPassword error %s", err.Error())
 	}
 
 	in, err := os.Open(infile)
 	if err != nil {
-		return fmt.Errorf("open input file failed:%v", err)
+		return "", fmt.Errorf("open input file failed:%v", err)
 	}
 	defer func() {
 		in.Close()
@@ -58,16 +60,14 @@ func encrypt(infile, password, privateKey string) error {
 
 	dir := filepath.Dir(infile)
 	ext := filepath.Ext(infile)
-	fmt.Println("ext :", ext)
 
 	fileName := filepath.Base(infile)
 	baseName := fileName[0 : len(fileName)-len(ext)]
-	fmt.Println("Base Name:", baseName)
 
 	outfile := filepath.Join(dir, fmt.Sprintf("%s_en", baseName))
 	out, err := os.Create(outfile)
 	if err != nil {
-		return fmt.Errorf("create output file failed:%v", err)
+		return "", fmt.Errorf("create output file failed:%v", err)
 	}
 	defer func() {
 		out.Close()
@@ -76,28 +76,23 @@ func encrypt(infile, password, privateKey string) error {
 	start := time.Now()
 	r, err := c.NewEncrypter(in, passBytes, cryptPass, []byte(ext))
 	if err != nil {
-		return fmt.Errorf("NewEncrypter failed:%v", err)
+		return "", fmt.Errorf("NewEncrypter failed:%v", err)
 	}
 
 	cx, err := io.Copy(out, r)
 	if err != nil {
-		return fmt.Errorf("io.Copy failed:%v", err)
+		return "", fmt.Errorf("io.Copy failed:%v", err)
 	}
 
 	elapsed := time.Since(start)
 	log.Infof("encrypt file %s, write:%d bytes to %s, time:%s", infile, cx, outfile, elapsed)
-	return nil
+	return outfile, nil
 }
 
-func decrypt(infile, password, privateKey string) error {
-	// infile := ctx.String("in")
-	// outfile := ctx.String("out")
-	// password := ctx.String("password")
-	// pKey := ctx.String("key")
-
+func decrypt(infile, password, privateKey string) (string, error) {
 	err := checkParameters(infile, password, privateKey, false)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	var passBytes []byte
@@ -107,7 +102,7 @@ func decrypt(infile, password, privateKey string) error {
 
 	in, err := os.Open(infile)
 	if err != nil {
-		return fmt.Errorf("open input file failed:%v", err)
+		return "", fmt.Errorf("open input file failed:%v", err)
 	}
 	defer func() {
 		in.Close()
@@ -129,18 +124,17 @@ func decrypt(infile, password, privateKey string) error {
 
 	r, extB, err := c.NewDecrypter(in, passBytes, decryptPassFunc)
 	if err != nil {
-		return fmt.Errorf("NewDecrypter failed:%v", err)
+		return "", fmt.Errorf("NewDecrypter failed:%v", err)
 	}
 
 	ext := string(extB)
-	fmt.Println("extB :", ext)
 
 	dir := filepath.Dir(infile)
 	outfile := filepath.Join(dir, fmt.Sprintf("de_file%s", ext))
 
 	out, err := os.Create(outfile)
 	if err != nil {
-		return fmt.Errorf("create output file failed:%v", err)
+		return "", fmt.Errorf("create output file failed:%v", err)
 	}
 	defer func() {
 		out.Close()
@@ -148,15 +142,15 @@ func decrypt(infile, password, privateKey string) error {
 
 	cx, err := io.Copy(out, r)
 	if err != nil {
-		return fmt.Errorf("io.Copy failed:%v", err)
+		return "", fmt.Errorf("io.Copy failed:%v", err)
 	}
 
 	elapsed := time.Since(start)
 	log.Infof("decrypt file %s, write:%d bytes to %s, time:%s", infile, cx, outfile, elapsed)
-	return nil
+	return outfile, nil
 }
 
-func main2() {
+func mainOld() {
 	cli.VersionPrinter = func(cCtx *cli.Context) {
 		fmt.Printf("version=%s commit=%s\n", cCtx.App.Version, version.GITCOMMIT)
 	}
@@ -176,7 +170,8 @@ func main2() {
 					password := cCtx.String("password")
 					pKey := cCtx.String("key")
 
-					return encrypt(infile, password, pKey)
+					_, err := encrypt(infile, password, pKey)
+					return err
 				},
 			},
 			{
@@ -189,7 +184,8 @@ func main2() {
 					password := cCtx.String("password")
 					pKey := cCtx.String("key")
 
-					return decrypt(infile, password, pKey)
+					_, err := decrypt(infile, password, pKey)
+					return err
 				},
 			},
 		},
@@ -223,86 +219,122 @@ func main2() {
 }
 
 func main() {
-	myApp := app.New()
-	myWindow := myApp.NewWindow("文件加解密")
+	fyneApp := app.New()
+	window := fyneApp.NewWindow("File encrypt and decrypt")
 
 	passwordEntry := widget.NewPasswordEntry()
-	passwordEntry.SetPlaceHolder("Enter password...")
-
 	privateKeyEntry := widget.NewPasswordEntry()
+	resultLabel := widget.NewLabel("")
+	inputFileEntry := widget.NewLabel(textInputFile)
+	uploadFileLabel := widget.NewLabel(textUploadFile)
+	apiKeyEntry := widget.NewEntry()
+	uploadResultLabel := widget.NewLabel("")
+
+	passwordEntry.SetPlaceHolder("Enter password...")
 	privateKeyEntry.SetPlaceHolder("Enter private key...")
+	apiKeyEntry.SetPlaceHolder(apiKeyFile)
 
-	inPutEntry := widget.NewLabel("Enter input file pash...")
-	// inPutEntry := widget.NewEntry()
-	// inPutEntry.SetPlaceHolder("Enter input file path...(ex: D:\\abc.txt)")
-
-	inPutBtn := widget.NewButton("select input file", func() {
+	inputFileBtn := widget.NewButton("select input file", func() {
 		fd := dialog.NewFileOpen(func(reader fyne.URIReadCloser, err error) {
 			if err == nil && reader != nil {
-				inPutEntry.SetText(reader.URI().Path())
+				inputFileEntry.SetText(reader.URI().Path())
 			}
-		}, myWindow)
+		}, window)
 		fd.Show()
 	})
 
-	// outPutEntry := widget.NewEntry()
-	// outPutEntry.SetPlaceHolder("Enter output file path...(ex: D:\\abc.txt)")
-
-	resultLabel := widget.NewLabel("")
-
 	encryptBtn := widget.NewButton("encrypt", func() {
-		infile := inPutEntry.Text
-		// outfile := outPutEntry.Text
+		infile := inputFileEntry.Text
 		password := passwordEntry.Text
 		pKey := privateKeyEntry.Text
-		resultText := "success !!!"
+		resultText := ""
 
-		err := encrypt(infile, password, pKey)
+		outFile, err := encrypt(infile, password, pKey)
 		if err != nil {
 			resultText = err.Error()
+		} else {
+			resultText = fmt.Sprintf("encrypt success ! output file: %s", outFile)
+			uploadFileLabel.SetText(outFile)
 		}
 
 		resultLabel.SetText(resultText)
 	})
 
 	decryptBtn := widget.NewButton("decrypt", func() {
-		infile := inPutEntry.Text
-		// outfile := outPutEntry.Text
+		infile := inputFileEntry.Text
 		password := passwordEntry.Text
 		pKey := privateKeyEntry.Text
-		resultText := "success !!!"
+		resultText := ""
 
-		err := decrypt(infile, password, pKey)
+		outFile, err := decrypt(infile, password, pKey)
 		if err != nil {
 			resultText = err.Error()
+		} else {
+			resultText = fmt.Sprintf("decrypt success ! output file: %s", outFile)
 		}
 
 		resultLabel.SetText(resultText)
 	})
 
-	myWindow.SetContent(container.NewVBox(
+	uploadFileBtn := widget.NewButton("select upload file", func() {
+		fd := dialog.NewFileOpen(func(reader fyne.URIReadCloser, err error) {
+			if err == nil && reader != nil {
+				inputFileEntry.SetText(reader.URI().Path())
+			}
+		}, window)
+		fd.Show()
+	})
+
+	uploadBtn := widget.NewButton("upload to titan", func() {
+		apiKey := apiKeyEntry.Text
+		fmt.Println(apiKey)
+		if apiKey == "" {
+			uploadResultLabel.SetText("please enter the api key")
+			return
+		}
+
+		filePath := uploadFileLabel.Text
+		if filePath == textUploadFile {
+			uploadResultLabel.SetText("please enter the upload file path")
+			return
+		}
+
+		confirmDialog := dialog.NewConfirm("Please confirm to upload the following files", filePath, func(result bool) {
+			if result {
+				err := uploadFileToTitan(locatorURL, apiKey, filePath, "1")
+				if err != nil {
+					uploadResultLabel.SetText(err.Error())
+				} else {
+					uploadResultLabel.SetText("upload success !")
+				}
+			}
+		}, window)
+		confirmDialog.Show()
+	})
+
+	window.SetContent(container.NewVBox(
 		privateKeyEntry,
 		passwordEntry,
-		inPutEntry,
-		inPutBtn,
-		// outPutEntry,
+		inputFileEntry,
+		inputFileBtn,
 		resultLabel,
 		encryptBtn,
 		decryptBtn,
+		apiKeyEntry,
+		uploadFileLabel,
+		uploadFileBtn,
+		uploadResultLabel,
+		uploadBtn,
 	))
 
-	myWindow.Resize(fyne.NewSize(600, 400))
-	myWindow.ShowAndRun()
+	window.Resize(fyne.NewSize(800, 600))
+	window.ShowAndRun()
 }
 
 func checkParameters(infile, password, pKey string, isEncrypt bool) error {
-	if infile == "" {
+	if infile == textInputFile {
 		return fmt.Errorf("please enter the input file pash")
 	}
-
-	// if outfile == "" {
-	// 	return fmt.Errorf("please enter the output file pash")
-	// }
 
 	if isEncrypt {
 		if pKey == "" {
@@ -338,4 +370,43 @@ func encryptPassword(pass []byte, pKey string) ([]byte, error) {
 	publicKey := ecies.ImportECDSAPublic(publicKeyECDSA)
 
 	return ecies.Encrypt(rand.Reader, publicKey, pass, nil, nil)
+}
+
+func uploadFileToTitan(locatorURL, apiKey, filePath, password string) error {
+	storage, close, err := storage.NewStorage(locatorURL, apiKey)
+	if err != nil {
+		return err
+	}
+	defer close()
+
+	progress := func(doneSize int64, totalSize int64) {
+		fmt.Printf("upload %d of %d \n", doneSize, totalSize)
+	}
+
+	visitFile := func(fp string, fi os.DirEntry, err error) error {
+		// Check for and handle errors
+		if err != nil {
+			fmt.Println(err) // Can be used to handle errors (e.g., permission denied)
+			return nil
+		}
+
+		if fi.IsDir() {
+			return nil
+		}
+
+		path, err := filepath.Abs(fp)
+		if err != nil {
+			return err
+		}
+
+		_, err = storage.UploadFilesWithPath(context.Background(), path, progress, password)
+		if err != nil {
+			return err
+		}
+
+		fmt.Printf("totalSize %s success \n", fp)
+		return nil
+	}
+
+	return filepath.WalkDir(filePath, visitFile)
 }
