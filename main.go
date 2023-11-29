@@ -279,7 +279,7 @@ func main() {
 	uploadFileBtn := widget.NewButton("select upload file", func() {
 		fd := dialog.NewFileOpen(func(reader fyne.URIReadCloser, err error) {
 			if err == nil && reader != nil {
-				inputFileEntry.SetText(reader.URI().Path())
+				uploadFileLabel.SetText(reader.URI().Path())
 			}
 		}, window)
 		fd.Show()
