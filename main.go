@@ -29,12 +29,22 @@ const (
 	passwordLenMax = 14
 	passwordLenMin = 6
 
-	textInputFile  = "Enter input file pash..."
-	textUploadFile = "Enter upload file pash..."
+	title = "File encrypt and decrypt"
+
+	textInputFile  = "Select input file pash..."
+	textUploadFile = "Select upload file pash..."
 	apiKeyFile     = "Enter api key..."
+	textInputPass  = "Enter password..."
+	textInputKey   = "Enter private key..."
+
+	textInputFileBtn    = "Select input file"
+	textEncryptBtn      = "Encrypt"
+	textDecryptBtn      = "Decrypt"
+	textSelectFileBtn   = "Select upload file"
+	textUploadBtn       = "Upload to titan"
+	confirmDialogTTitle = "Please confirm to upload the following file"
 
 	locatorURL = "https://120.79.221.36:5000/rpc/v0"
-	// apiKey     = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJBbGxvdyI6WyJ1c2VyIl0sIklEIjoiMHhlYjU0OWYwYjk4ODdmNDE1MGRiZDNiZDBhMjU3ZDk5ZDVlMzE2ZGJhIiwiTm9kZUlEIjoiIiwiRXh0ZW5kIjoiIn0.16n87W0DvAZp60JSRHHNbo-DLU_Tycp-Av5mrnpsHVI"
 )
 
 func encrypt(infile, password, privateKey string) (string, error) {
@@ -220,7 +230,7 @@ func mainOld() {
 
 func main() {
 	fyneApp := app.New()
-	window := fyneApp.NewWindow("File encrypt and decrypt")
+	window := fyneApp.NewWindow(title)
 
 	passwordEntry := widget.NewPasswordEntry()
 	privateKeyEntry := widget.NewPasswordEntry()
@@ -230,11 +240,11 @@ func main() {
 	apiKeyEntry := widget.NewEntry()
 	uploadResultLabel := widget.NewLabel("")
 
-	passwordEntry.SetPlaceHolder("Enter password...")
-	privateKeyEntry.SetPlaceHolder("Enter private key...")
+	passwordEntry.SetPlaceHolder(textInputPass)
+	privateKeyEntry.SetPlaceHolder(textInputKey)
 	apiKeyEntry.SetPlaceHolder(apiKeyFile)
 
-	inputFileBtn := widget.NewButton("select input file", func() {
+	inputFileBtn := widget.NewButton(textInputFileBtn, func() {
 		fd := dialog.NewFileOpen(func(reader fyne.URIReadCloser, err error) {
 			if err == nil && reader != nil {
 				inputFileEntry.SetText(reader.URI().Path())
@@ -243,7 +253,7 @@ func main() {
 		fd.Show()
 	})
 
-	encryptBtn := widget.NewButton("encrypt", func() {
+	encryptBtn := widget.NewButton(textEncryptBtn, func() {
 		infile := inputFileEntry.Text
 		password := passwordEntry.Text
 		pKey := privateKeyEntry.Text
@@ -251,7 +261,7 @@ func main() {
 
 		outFile, err := encrypt(infile, password, pKey)
 		if err != nil {
-			resultText = err.Error()
+			resultText = fmt.Sprintf("error : %s", err.Error())
 		} else {
 			resultText = fmt.Sprintf("encrypt success ! output file: %s", outFile)
 			uploadFileLabel.SetText(outFile)
@@ -260,7 +270,7 @@ func main() {
 		resultLabel.SetText(resultText)
 	})
 
-	decryptBtn := widget.NewButton("decrypt", func() {
+	decryptBtn := widget.NewButton(textDecryptBtn, func() {
 		infile := inputFileEntry.Text
 		password := passwordEntry.Text
 		pKey := privateKeyEntry.Text
@@ -276,7 +286,7 @@ func main() {
 		resultLabel.SetText(resultText)
 	})
 
-	uploadFileBtn := widget.NewButton("select upload file", func() {
+	uploadFileBtn := widget.NewButton(textSelectFileBtn, func() {
 		fd := dialog.NewFileOpen(func(reader fyne.URIReadCloser, err error) {
 			if err == nil && reader != nil {
 				uploadFileLabel.SetText(reader.URI().Path())
@@ -285,27 +295,27 @@ func main() {
 		fd.Show()
 	})
 
-	uploadBtn := widget.NewButton("upload to titan", func() {
+	uploadBtn := widget.NewButton(textUploadBtn, func() {
 		apiKey := apiKeyEntry.Text
-		fmt.Println(apiKey)
+		// fmt.Println(apiKey)
 		if apiKey == "" {
-			uploadResultLabel.SetText("please enter the api key")
+			uploadResultLabel.SetText("error : please enter the api key")
 			return
 		}
 
 		filePath := uploadFileLabel.Text
 		if filePath == textUploadFile {
-			uploadResultLabel.SetText("please enter the upload file path")
+			uploadResultLabel.SetText("error : please enter the upload file path")
 			return
 		}
 
-		confirmDialog := dialog.NewConfirm("Please confirm to upload the following files", filePath, func(result bool) {
+		confirmDialog := dialog.NewConfirm(confirmDialogTTitle, filePath, func(result bool) {
 			if result {
 				fCid, err := uploadFileToTitan(locatorURL, apiKey, filePath, "1")
 				if err != nil {
-					uploadResultLabel.SetText(err.Error())
+					uploadResultLabel.SetText(fmt.Sprintf("error : %s", err.Error()))
 				} else {
-					uploadResultLabel.SetText(fCid)
+					uploadResultLabel.SetText(fmt.Sprintf("cid : %s", fCid))
 				}
 			}
 		}, window)
