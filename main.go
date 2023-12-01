@@ -26,16 +26,19 @@ import (
 )
 
 const (
-	passwordLenMax = 14
+
+	// 3c3633bfaa3f8cfc2df9169d763eda6a8fb06d632e553f969f9dd2edd64dd11b
+	passwordLenMax = 70
 	passwordLenMin = 6
 
 	title = "File encrypt and decrypt"
 
-	textInputFile  = "Select input file pash..."
-	textUploadFile = "Select upload file pash..."
-	apiKeyFile     = "Enter api key..."
-	textInputPass  = "Enter password..."
-	textInputKey   = "Enter private key..."
+	textInputFile     = "Drag and drop a file here"
+	textUploadFile    = "Drag and drop a file here"
+	textDragErrorFile = "Drag and drop file format error"
+	apiKeyFile        = "Enter api key..."
+	textInputPass     = "Enter password..."
+	textInputKey      = "Enter private key..."
 
 	textInputFileBtn    = "Select input file"
 	textEncryptBtn      = "Encrypt"
@@ -47,20 +50,26 @@ const (
 	locatorURL = "https://120.79.221.36:5000/rpc/v0"
 )
 
-func encrypt(infile, password, privateKey string) (string, error) {
-	err := checkParameters(infile, password, privateKey, true)
+func encrypt(inFile, password, privateKey string) (string, error) {
+	if password == "" {
+		password = privateKey
+	}
+
+	err := checkParameters(inFile, password, privateKey, true)
 	if err != nil {
 		return "", err
 	}
 
+	fmt.Println("password len:", len(password))
 	passBytes := []byte(password)
+	fmt.Println("byte len:", len(passBytes))
 
 	cryptPass, err := encryptPassword(passBytes, privateKey)
 	if err != nil {
 		return "", fmt.Errorf("encryptPassword error %s", err.Error())
 	}
 
-	in, err := os.Open(infile)
+	in, err := os.Open(inFile)
 	if err != nil {
 		return "", fmt.Errorf("open input file failed:%v", err)
 	}
@@ -68,14 +77,14 @@ func encrypt(infile, password, privateKey string) (string, error) {
 		in.Close()
 	}()
 
-	dir := filepath.Dir(infile)
-	ext := filepath.Ext(infile)
+	dir := filepath.Dir(inFile)
+	ext := filepath.Ext(inFile)
 
-	fileName := filepath.Base(infile)
+	fileName := filepath.Base(inFile)
 	baseName := fileName[0 : len(fileName)-len(ext)]
 
-	outfile := filepath.Join(dir, fmt.Sprintf("%s_en", baseName))
-	out, err := os.Create(outfile)
+	outFile := filepath.Join(dir, fmt.Sprintf("%s_en", baseName))
+	out, err := os.Create(outFile)
 	if err != nil {
 		return "", fmt.Errorf("create output file failed:%v", err)
 	}
@@ -95,12 +104,12 @@ func encrypt(infile, password, privateKey string) (string, error) {
 	}
 
 	elapsed := time.Since(start)
-	log.Infof("encrypt file %s, write:%d bytes to %s, time:%s", infile, cx, outfile, elapsed)
-	return outfile, nil
+	log.Infof("encrypt file %s, write:%d bytes to %s, time:%s", inFile, cx, outFile, elapsed)
+	return outFile, nil
 }
 
-func decrypt(infile, password, privateKey string) (string, error) {
-	err := checkParameters(infile, password, privateKey, false)
+func decrypt(inFile, password, privateKey string) (string, error) {
+	err := checkParameters(inFile, password, privateKey, false)
 	if err != nil {
 		return "", err
 	}
@@ -110,7 +119,7 @@ func decrypt(infile, password, privateKey string) (string, error) {
 		passBytes = []byte(password)
 	}
 
-	in, err := os.Open(infile)
+	in, err := os.Open(inFile)
 	if err != nil {
 		return "", fmt.Errorf("open input file failed:%v", err)
 	}
@@ -139,10 +148,10 @@ func decrypt(infile, password, privateKey string) (string, error) {
 
 	ext := string(extB)
 
-	dir := filepath.Dir(infile)
-	outfile := filepath.Join(dir, fmt.Sprintf("de_file%s", ext))
+	dir := filepath.Dir(inFile)
+	outFile := filepath.Join(dir, fmt.Sprintf("de_file%s", ext))
 
-	out, err := os.Create(outfile)
+	out, err := os.Create(outFile)
 	if err != nil {
 		return "", fmt.Errorf("create output file failed:%v", err)
 	}
@@ -156,8 +165,8 @@ func decrypt(infile, password, privateKey string) (string, error) {
 	}
 
 	elapsed := time.Since(start)
-	log.Infof("decrypt file %s, write:%d bytes to %s, time:%s", infile, cx, outfile, elapsed)
-	return outfile, nil
+	log.Infof("decrypt file %s, write:%d bytes to %s, time:%s", inFile, cx, outFile, elapsed)
+	return outFile, nil
 }
 
 func mainOld() {
@@ -175,12 +184,12 @@ func mainOld() {
 				Aliases: []string{"e"},
 				Usage:   "encrypt a file",
 				Action: func(cCtx *cli.Context) error {
-					infile := cCtx.String("in")
-					// outfile := cCtx.String("out")
+					inFile := cCtx.String("in")
+					// outFile := cCtx.String("out")
 					password := cCtx.String("password")
 					pKey := cCtx.String("key")
 
-					_, err := encrypt(infile, password, pKey)
+					_, err := encrypt(inFile, password, pKey)
 					return err
 				},
 			},
@@ -189,12 +198,12 @@ func mainOld() {
 				Aliases: []string{"d"},
 				Usage:   "decrypt a file",
 				Action: func(cCtx *cli.Context) error {
-					infile := cCtx.String("in")
-					// outfile := cCtx.String("out")
+					inFile := cCtx.String("in")
+					// outFile := cCtx.String("out")
 					password := cCtx.String("password")
 					pKey := cCtx.String("key")
 
-					_, err := decrypt(infile, password, pKey)
+					_, err := decrypt(inFile, password, pKey)
 					return err
 				},
 			},
@@ -235,7 +244,7 @@ func main() {
 	passwordEntry := widget.NewPasswordEntry()
 	privateKeyEntry := widget.NewPasswordEntry()
 	resultLabel := widget.NewLabel("")
-	inputFileEntry := widget.NewLabel(textInputFile)
+	inputFileLabel := widget.NewLabel(textInputFile)
 	uploadFileLabel := widget.NewLabel(textUploadFile)
 	apiKeyEntry := widget.NewEntry()
 	uploadResultLabel := widget.NewLabel("")
@@ -244,22 +253,13 @@ func main() {
 	privateKeyEntry.SetPlaceHolder(textInputKey)
 	apiKeyEntry.SetPlaceHolder(apiKeyFile)
 
-	inputFileBtn := widget.NewButton(textInputFileBtn, func() {
-		fd := dialog.NewFileOpen(func(reader fyne.URIReadCloser, err error) {
-			if err == nil && reader != nil {
-				inputFileEntry.SetText(reader.URI().Path())
-			}
-		}, window)
-		fd.Show()
-	})
-
 	encryptBtn := widget.NewButton(textEncryptBtn, func() {
-		infile := inputFileEntry.Text
+		inFile := inputFileLabel.Text
 		password := passwordEntry.Text
 		pKey := privateKeyEntry.Text
 		resultText := ""
 
-		outFile, err := encrypt(infile, password, pKey)
+		outFile, err := encrypt(inFile, password, pKey)
 		if err != nil {
 			resultText = fmt.Sprintf("error : %s", err.Error())
 		} else {
@@ -271,12 +271,12 @@ func main() {
 	})
 
 	decryptBtn := widget.NewButton(textDecryptBtn, func() {
-		infile := inputFileEntry.Text
+		inFile := inputFileLabel.Text
 		password := passwordEntry.Text
 		pKey := privateKeyEntry.Text
 		resultText := ""
 
-		outFile, err := decrypt(infile, password, pKey)
+		outFile, err := decrypt(inFile, password, pKey)
 		if err != nil {
 			resultText = err.Error()
 		} else {
@@ -284,15 +284,6 @@ func main() {
 		}
 
 		resultLabel.SetText(resultText)
-	})
-
-	uploadFileBtn := widget.NewButton(textSelectFileBtn, func() {
-		fd := dialog.NewFileOpen(func(reader fyne.URIReadCloser, err error) {
-			if err == nil && reader != nil {
-				uploadFileLabel.SetText(reader.URI().Path())
-			}
-		}, window)
-		fd.Show()
 	})
 
 	uploadBtn := widget.NewButton(textUploadBtn, func() {
@@ -322,17 +313,52 @@ func main() {
 		confirmDialog.Show()
 	})
 
+	window.SetOnDropped(func(position fyne.Position, uris []fyne.URI) {
+		log.Println("X:", position.X, " Y:", position.Y)
+
+		if len(uris) <= 0 {
+			return
+		}
+
+		var input *widget.Label
+		if position.Y > 80 && position.Y < 120 {
+			input = inputFileLabel
+		}
+
+		if position.Y > 280 && position.Y < 320 {
+			input = uploadFileLabel
+		}
+
+		if input == nil {
+			return
+		}
+
+		fille := uris[0]
+		path := fille.Path()
+
+		fileInfo, err := os.Stat(path)
+		if err != nil {
+			log.Println(err)
+			input.SetText(textDragErrorFile)
+			return
+		}
+
+		if fileInfo.IsDir() {
+			input.SetText(textDragErrorFile)
+		} else {
+			input.SetText(path)
+		}
+	})
+
 	window.SetContent(container.NewVBox(
 		privateKeyEntry,
 		passwordEntry,
-		inputFileEntry,
-		inputFileBtn,
+		inputFileLabel,
 		resultLabel,
 		encryptBtn,
 		decryptBtn,
 		apiKeyEntry,
 		uploadFileLabel,
-		uploadFileBtn,
 		uploadResultLabel,
 		uploadBtn,
 	))
@@ -341,8 +367,8 @@ func main() {
 	window.ShowAndRun()
 }
 
-func checkParameters(infile, password, pKey string, isEncrypt bool) error {
-	if infile == textInputFile {
+func checkParameters(inFile, password, pKey string, isEncrypt bool) error {
+	if inFile == textInputFile {
 		return fmt.Errorf("please enter the input file pash")
 	}
 

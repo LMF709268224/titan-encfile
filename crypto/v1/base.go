@@ -19,7 +19,7 @@ const (
 	saltSize = 32 // 256 bits
 
 	// The size of the password .
-	passwordSize = 128 // 1024 bits
+	passwordSize = 256 // 2048 bits
 
 	// The size of the file ext.
 	fileExtSize = 8 // 32 bits

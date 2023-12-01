@@ -8,7 +8,6 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"hash"
 	"io"
 
@@ -115,8 +114,6 @@ func newEncryptReader(r io.Reader, pass, cryptPass, salt, fileExt []byte, iterat
 	if err != nil {
 		return nil, err
 	}
-
-	fmt.Println("fileExt size :", len(fileExt))
 
 	cryptPass2 := padToSpecifiedBytes(cryptPass, passwordSize)
 	fileExt2 := padToSpecifiedBytes(fileExt, fileExtSize)
