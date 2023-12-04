@@ -11,7 +11,6 @@ import (
 
 	c "encfile/crypto"
 	"encfile/storage"
-	"encfile/version"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/crypto/ecies"
@@ -22,7 +21,6 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
-	"github.com/urfave/cli/v2"
 )
 
 const (
@@ -169,74 +167,6 @@ func decrypt(inFile, password, privateKey string) (string, error) {
 	return outFile, nil
 }
 
-func mainOld() {
-	cli.VersionPrinter = func(cCtx *cli.Context) {
-		fmt.Printf("version=%s commit=%s\n", cCtx.App.Version, version.GITCOMMIT)
-	}
-
-	app := &cli.App{
-		Name:    "encfile",
-		Usage:   "encrypt or decrypt file",
-		Version: version.VERSION,
-		Commands: []*cli.Command{
-			{
-				Name:    "encrypt",
-				Aliases: []string{"e"},
-				Usage:   "encrypt a file",
-				Action: func(cCtx *cli.Context) error {
-					inFile := cCtx.String("in")
-					// outFile := cCtx.String("out")
-					password := cCtx.String("password")
-					pKey := cCtx.String("key")
-
-					_, err := encrypt(inFile, password, pKey)
-					return err
-				},
-			},
-			{
-				Name:    "decrypt",
-				Aliases: []string{"d"},
-				Usage:   "decrypt a file",
-				Action: func(cCtx *cli.Context) error {
-					inFile := cCtx.String("in")
-					// outFile := cCtx.String("out")
-					password := cCtx.String("password")
-					pKey := cCtx.String("key")
-
-					_, err := decrypt(inFile, password, pKey)
-					return err
-				},
-			},
-		},
-		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:     "password",
-				Required: false,
-				EnvVars:  []string{"ENCFILE_PASSWORD"},
-			},
-			&cli.StringFlag{
-				Name:     "key",
-				Required: false,
-				EnvVars:  []string{"PRIVATE_KEY"},
-			},
-			&cli.StringFlag{
-				Name:     "in",
-				Required: true,
-				EnvVars:  []string{"ENCFILE_IN"},
-			},
-			&cli.StringFlag{
-				Name:     "out",
-				Required: true,
-				EnvVars:  []string{"ENCFILE_OUT"},
-			},
-		},
-	}
-
-	if err := app.Run(os.Args); err != nil {
-		log.Fatal(err)
-	}
-}
-
 func main() {
 	fyneApp := app.New()
 	window := fyneApp.NewWindow(title)
@@ -378,11 +308,11 @@ func checkParameters(inFile, password, pKey string, isEncrypt bool) error {
 		}
 
 		if len(password) < passwordLenMin {
-			return fmt.Errorf("password length should >= 6")
+			return fmt.Errorf("password length should >= %d", passwordLenMin)
 		}
 
 		if len(password) > passwordLenMax {
-			return fmt.Errorf("password length should <= 14")
+			return fmt.Errorf("password length should <= %d", passwordLenMax)
 		}
 
 		return nil
