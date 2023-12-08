@@ -24,8 +24,6 @@ import (
 )
 
 const (
-
-	// 3c3633bfaa3f8cfc2df9169d763eda6a8fb06d632e553f969f9dd2edd64dd11b
 	passwordLenMax = 70
 	passwordLenMin = 6
 
